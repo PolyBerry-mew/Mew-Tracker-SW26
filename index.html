@@ -161,6 +161,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
 td.note{color:var(--subtext0); font-size:12.5px; max-width:230px}
 td.warn{color:var(--peach); font-size:12.5px; max-width:200px}
 .mon{white-space:nowrap}
+.mon.gone{text-decoration:line-through; color:var(--overlay0)}
+.mon.gone .pc{color:var(--overlay0)}
 .pc{color:var(--overlay1); font-size:11.5px}
 .st{font-weight:800; font-size:12.5px; white-space:nowrap}
 .st::before{content:"●"; margin-right:5px; font-size:9px; vertical-align:1px}
@@ -365,9 +367,7 @@ footer{
 </div>
 
 <footer>
-  Route data and the catch log come straight from the team sheet; Google's publish
-  cache means edits can take a few minutes to show up here. The Pokédex is built from the
-  PokeMMO client data and lives entirely in this file. Nothing on this page can write to the sheet.
+  Team Méw sheet, created by Polymnia.
 </footer>
 
 <script>
@@ -491,12 +491,14 @@ function statusHTML(s){
   else if (/hit|devalu/i.test(s)) cls = "st-hit";
   return `<span class="st ${cls}">${s}</span>`;
 }
+let caughtSet = new Set();   /* species already caught | their unique bonus is spent */
 function monsHTML(r){
   const parts = [];
   for (let i=1;i<=4;i++){
     const m = r["mon"+i]; if (!m || m==="-") continue;
     const pc = r["split"+i];
-    parts.push(`<span class="mon">${m}${pc!=null?` <span class="pc">${Math.round(pc*100)}%</span>`:""}</span>`);
+    const gone = caughtSet.has(m.toLowerCase());
+    parts.push(`<span class="mon${gone?" gone":""}"${gone?' title="Already caught | unique bonus spent"':""}>${m}${pc!=null?` <span class="pc">${Math.round(pc*100)}%</span>`:""}</span>`);
   }
   return parts.join(" · ");
 }
@@ -579,7 +581,7 @@ function renderMeta(meta){
   if (!eggs.length){ $("#eggs").innerHTML = ""; return; }
   $("#eggs").innerHTML = `<span class="lbl">Egg EV benchmarks at</span>
     <input id="eggrate" type="number" min="1" step="10" value="${eggBase.rate}">
-    <span class="lbl">eggs/h —</span>` +
+    <span class="lbl">eggs/h:</span>` +
     eggs.map(e => `<span class="eggv" data-t="${e.t}" data-v="${e.v}">T${e.t} <b>${fmt(e.v,2)}</b>/h</span>`).join(" ") +
     `<span class="muted" style="font-size:12px">type your own hatch rate and the numbers rescale (your view only)</span>`;
   $("#eggrate").oninput = e => {
@@ -601,7 +603,7 @@ function renderFeed(rows){
         <div class="fi-m">${c.caught_ot || "?"} · ${c.time_caught || ""}</div></div>
       <div class="fi-p">+${fmt(num(c.points),0)}</div>
     </div>`).join("")
-  : '<div class="feeditem"><div class="fi-m">Nothing yet — first catch starts the board.</div></div>';
+  : '<div class="feeditem"><div class="fi-m">Nothing yet | first catch starts the board.</div></div>';
 }
 function renderCatches(rows){
   $("#catchtitle").hidden = false;
@@ -630,6 +632,7 @@ async function load(){
     const catches = catchCSV.slice(1).map(r => {
       const o = {}; chead.forEach((h,i)=> o[h] = (r[i]??"").trim()); return o;
     }).filter(c => c.species);
+    caughtSet = new Set(catches.map(c => c.species.trim().toLowerCase()));
     renderMeta(meta);
     renderFeed(catches);
     buildControls();
@@ -640,19 +643,19 @@ async function load(){
   } catch(e){
     note.hidden = false;
     note.innerHTML = isFile
-      ? `Couldn't reach the sheet — browsers block sheet requests when the page is opened
+      ? `Couldn't reach the sheet | browsers block sheet requests when the page is opened
          straight from a file. Host it (GitHub Pages works) or run
          <code>python -m http.server</code> in this folder and open <code>localhost:8000</code>.
          The Pokédex tab works fine either way.`
       : `Couldn't load the sheet data right now (<span class="muted">${e.message}</span>).
-         The published links sometimes hiccup — try Refresh in a minute. The Pokédex tab still works.`;
+         The published links sometimes hiccup | try Refresh in a minute. The Pokédex tab still works.`;
   }
 }
 $("#refresh").onclick = load;
 load();
 
 /* =====================================================================
-   Pokédex — every species in the PokeMMO client dump, embedded below.
+   Pokédex | every species in the PokeMMO client dump, embedded below.
    Regenerate with tools/build_site.py after a game update.
    Location entry: [regionIdx, locIdx, methodIdx, minLv, maxLv,
                     hordeCode(0/3/5), rarM, rarD, rarN, seasonMask]
@@ -665,7 +668,7 @@ function seasonText(mask){
   if (mask === 15) return "All year";
   return SEASON_BITS.filter(([b])=>mask&b).map(([,n])=>n).join(", ");
 }
-const rarName = i => i<0 ? "—" : DEX.rarities[i];
+const rarName = i => i<0 ? "-" : DEX.rarities[i];
 let dexBuilt = false;
 const dexState = { q:"", type:"", region:"", wild:false, season:0, time:-1 };
 
@@ -761,7 +764,7 @@ function openDetail(id){
         <thead><tr><th>Location</th><th>Method</th><th>Lv</th><th>Morning</th><th>Day</th><th>Night</th><th>Season</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
-  }).join("") : `<div class="nowild-big">No wild encounters — this one comes from evolution, breeding, events, or special means.</div>`;
+  }).join("") : `<div class="nowild-big">No wild encounters | this one comes from evolution, breeding, events, or special means.</div>`;
 
   $("#dcontent").innerHTML = `
     <div class="dhead">
@@ -783,7 +786,7 @@ function openDetail(id){
         </div>
         <h3>Details</h3>
         <div class="kv"><b>Catch rate</b> ${catchRate}</div>
-        <div class="kv"><b>Egg groups</b> ${eggs.join(", ") || "—"}</div>
+        <div class="kv"><b>Egg groups</b> ${eggs.join(", ") || "-"}</div>
         ${evos.length ? `<h3>Evolves into</h3>` + evos.map(e=>`<div class="evorow"><b>${e[0]}</b> <span class="how">· ${e[1]}</span></div>`).join("") : ""}
       </div>
       <div class="dcol" style="flex:2; min-width:300px">
