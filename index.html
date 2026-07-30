@@ -456,6 +456,19 @@ footer{
     <select class="tag" id="hsize"><option value="">Any size</option><option value="3">3x</option><option value="5">5x</option></select>
     <span class="count" id="hcount"></span>
   </div>
+  <div class="controls" style="padding-top:2px">
+    <label>Season</label>
+    <span class="tag on" data-hseason="">All Seasons</span>
+    <span class="tag" data-hseason="Spring">Spring</span>
+    <span class="tag" data-hseason="Summer">Summer</span>
+    <span class="tag" data-hseason="Autumn">Autumn</span>
+    <span class="tag" data-hseason="Winter">Winter</span>
+    <label style="margin-left:14px">Time</label>
+    <span class="tag on" data-htime="">All Day</span>
+    <span class="tag" data-htime="Morning">Morning</span>
+    <span class="tag" data-htime="Day">Day</span>
+    <span class="tag" data-htime="Night">Night</span>
+  </div>
   <div id="hwrap">
     <table>
       <thead><tr id="hheadrow"></tr></thead>
@@ -1019,10 +1032,10 @@ function movesHTML(id, tys){
   </div>`;
 }
 
-/* ---- Hordes view: raw game-data horde dump in the route-page format.
-   Same table styling and click-to-sort headers, no live rank.
-   Split = each mon's encounter % within the horde location (day rate,
-   falling back to morning/night), shown route-page style. ---- */
+/* ---- Hordes view: game-data horde dump in the route-page format.
+   One row per location + horde size + season/time pool. Splits are
+   normalized against each other inside the pool, so a solo 5% horde
+   shows 100%, a 2.5% share of that pool shows 50%, and so on. ---- */
 const HCOLS = [
   {k:"location", label:"Location", cls:"loc"},
   {k:"region",   label:"Region"},
@@ -1033,41 +1046,68 @@ const HCOLS = [
   {k:"lv",       label:"Lv",    cls:"num", numeric:true},
   {k:"mons",     label:"Mons (split)", sortKey:"mon1"},
 ];
+const H_TIMES = ["Morning","Day","Night"];
 let hordesBuilt = false, hordeRows = [], hSortCol = "location", hSortDir = 1;
-const hState = { q:"", region:"", size:"" };
+const hState = { q:"", region:"", size:"", season:"", time:"" };
 function buildHordes(){
   hordesBuilt = true;
   const groups = new Map();
-  const pctOf = ri => { if (ri < 0) return null; const n = parseFloat(DEX.rarities[ri]); return isNaN(n) ? null : n; };
   for (const m of DEX.mons)
     for (const L of m[8])
       if (L[5]){
         const key = L[0] + "|" + L[1] + "|" + L[2] + "|" + L[5];
-        if (!groups.has(key)) groups.set(key, { ri:L[0], li:L[1], mi:L[2], h:L[5],
-          mons:[], mn:999, mx:0, sm:0, tm:[false,false,false] });
-        const g = groups.get(key);
-        const best = L[7] >= 0 ? L[7] : (L[6] >= 0 ? L[6] : L[8]);
-        g.mons.push({ id:m[0], name:m[1], split:pctOf(best), rlabel:best >= 0 ? DEX.rarities[best] : "" });
-        g.mn = Math.min(g.mn, L[3]); g.mx = Math.max(g.mx, L[4]); g.sm |= L[9];
-        if (L[6] >= 0) g.tm[0] = true; if (L[7] >= 0) g.tm[1] = true; if (L[8] >= 0) g.tm[2] = true;
+        if (!groups.has(key)) groups.set(key, { ri:L[0], li:L[1], mi:L[2], h:L[5], es:[] });
+        groups.get(key).es.push({ id:m[0], name:m[1], mask:L[9], rar:[L[6],L[7],L[8]], mn:L[3], mx:L[4] });
       }
-  hordeRows = [...groups.values()].map(g => {
-    g.mons.sort((a,b) => (b.split ?? -1) - (a.split ?? -1) || a.name.localeCompare(b.name));
-    const t = g.tm;
-    return {
-      location: DEX.locs[g.li], region: DEX.regions[g.ri], regionIdx: g.ri,
-      method: DEX.methods[g.mi], horde: g.h,
-      lv: g.mn, lvText: g.mn === g.mx ? String(g.mn) : g.mn + "\u2013" + g.mx,
-      season: (g.sm === 15 ? "All Seasons" : seasonText(g.sm)),
-      time: (t[0] && t[1] && t[2]) ? "All Day" : [t[0] && "Morning", t[1] && "Day", t[2] && "Night"].filter(Boolean).join("/"),
-      mons: g.mons, mon1: g.mons[0] ? g.mons[0].name : "",
-    };
-  });
+  const pctOf = ri => { const n = parseFloat(DEX.rarities[ri]); return isNaN(n) ? null : n; };
+  hordeRows = [];
+  for (const g of groups.values()){
+    /* build the actual encounter pool for every season x time slot,
+       then merge slots whose pool is identical */
+    const variants = new Map();
+    for (let s = 0; s < 4; s++)
+      for (let t = 0; t < 3; t++){
+        const pool = g.es.filter(e => (e.mask & (1 << s)) && e.rar[t] >= 0);
+        if (!pool.length) continue;
+        const sig = pool.map(e => e.id + ":" + e.rar[t]).sort().join(",");
+        if (!variants.has(sig))
+          variants.set(sig, { items: pool.map(e => ({ id:e.id, name:e.name, ri:e.rar[t], mn:e.mn, mx:e.mx })), sm:0, tm:new Set() });
+        const v = variants.get(sig); v.sm |= 1 << s; v.tm.add(t);
+      }
+    for (const v of variants.values()){
+      const raws = v.items.map(it => pctOf(it.ri));
+      const denom = raws.reduce((a,b) => a + (b || 0), 0);
+      const mons = v.items.map((it,ix) => ({
+        id: it.id, name: it.name,
+        split: (raws[ix] != null && denom > 0) ? raws[ix] / denom * 100 : null,
+        rlabel: DEX.rarities[it.ri],
+      })).sort((a,b) => (b.split ?? -1) - (a.split ?? -1) || a.name.localeCompare(b.name));
+      const mn = Math.min(...v.items.map(it => it.mn)), mx = Math.max(...v.items.map(it => it.mx));
+      hordeRows.push({
+        location: DEX.locs[g.li], region: DEX.regions[g.ri], regionIdx: g.ri,
+        method: DEX.methods[g.mi], horde: g.h,
+        lv: mn, lvText: mn === mx ? String(mn) : mn + "\u2013" + mx,
+        season: v.sm === 15 ? "All Seasons" : seasonText(v.sm),
+        time: v.tm.size === 3 ? "All Day" : [...v.tm].sort().map(i => H_TIMES[i]).join("/"),
+        mons, mon1: mons[0] ? mons[0].name : "",
+      });
+    }
+  }
   $("#hregion").innerHTML = '<option value="">Any region</option>' +
     DEX.regions.map((r,i) => `<option value="${i}">${r}</option>`).join("");
   $("#hsearch").oninput = e => { hState.q = e.target.value.trim().toLowerCase(); renderHordes(); };
   $("#hregion").onchange = e => { hState.region = e.target.value; renderHordes(); };
   $("#hsize").onchange = e => { hState.size = e.target.value; renderHordes(); };
+  document.querySelectorAll("[data-hseason]").forEach(ch => ch.onclick = () => {
+    hState.season = ch.dataset.hseason;
+    document.querySelectorAll("[data-hseason]").forEach(c => c.classList.toggle("on", c === ch));
+    renderHordes();
+  });
+  document.querySelectorAll("[data-htime]").forEach(ch => ch.onclick = () => {
+    hState.time = ch.dataset.htime;
+    document.querySelectorAll("[data-htime]").forEach(c => c.classList.toggle("on", c === ch));
+    renderHordes();
+  });
   renderHordes();
 }
 function hMonsHTML(r){
@@ -1081,6 +1121,8 @@ function renderHordes(){
   const rows = hordeRows.filter(r =>
     (hState.region === "" || r.regionIdx === +hState.region) &&
     (hState.size === "" || r.horde === +hState.size) &&
+    (!hState.season || r.season === "All Seasons" || r.season.includes(hState.season)) &&
+    (!hState.time || r.time === "All Day" || r.time.includes(hState.time)) &&
     (!hState.q || r.location.toLowerCase().includes(hState.q) ||
       r.mons.some(m => m.name.toLowerCase().includes(hState.q))));
   const col = HCOLS.find(c => c.k === hSortCol) || HCOLS[0];
@@ -1100,7 +1142,7 @@ function renderHordes(){
     else { hSortCol = k; hSortDir = HCOLS.find(c => c.k === k)?.numeric ? -1 : 1; }
     renderHordes();
   });
-  $("#hcount").textContent = rows.length + " horde spots";
+  $("#hcount").textContent = rows.length + " horde pools";
   $("#htbody").innerHTML = rows.map(r => `<tr>
       <td class="loc">${r.location}</td>
       <td>${r.region}</td>
@@ -1198,18 +1240,15 @@ function renderSeasonal(){
       <td>${lv}</td><td>${cat}</td>${hasLoc ? `<td>${loc || ""}</td>` : ""}
     </tr>`).join("")
     : `<tr><td colspan="5" style="opacity:.7">No data logged for ${seasonPick} yet. Fill the "Seasonal Optimal" tab in the team sheet.</td></tr>`;
-  const liveTag = ok => ok
-    ? '<span style="font-size:11px;opacity:.7">· live from the team sheet</span>'
-    : '<span style="font-size:11px;opacity:.7">· embedded snapshot (publishes go live automatically)</span>';
   $("#scontent").innerHTML = `
-    <h2 style="margin:0 0 4px">Seasonal picks ${liveTag(seasonalLive)}</h2>
+    <h2 style="margin:0 0 4px">Seasonal picks</h2>
     <div class="seastabs">${["Spring","Summer","Autumn","Winter"].map(s =>
       `<span class="tag${s === seasonPick ? " on" : ""}" data-seas="${s}">${s}</span>`).join("")}</div>
     <table class="seastbl">
       <thead><tr><th>#</th><th>Pokémon</th><th>Lv</th><th>Category</th>${hasLoc ? "<th>Where</th>" : ""}</tr></thead>
       <tbody>${seasRows}</tbody>
     </table>
-    <h2 style="margin:18px 0 4px">Altering Cave ${liveTag(altcaveLive)}</h2>
+    <h2 style="margin:18px 0 4px">Altering Cave</h2>
     <div style="font-size:13px;opacity:.8">Rotates every 6 hours (one in-game day). Tap the rotation currently up. The previous one is remembered automatically.</div>
     <div style="margin:8px 0 2px">${ALTCAVE.order.map(r =>
       `<button class="smallbtn rotbtn${st.cur === r ? " cur" : ""}" data-rot="${r}">${r}</button>`).join("")}</div>
