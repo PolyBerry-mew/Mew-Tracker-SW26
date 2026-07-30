@@ -325,9 +325,21 @@ footer{
 .movesec h4{margin:10px 0 2px;font-size:13px}
 .movesec details summary{cursor:pointer;font-size:13px;font-weight:700;margin:10px 0 2px}
 /* ---- hordes view ---- */
+#hordewrap{display:flex; gap:0; align-items:flex-start}
+#hmain{flex:1; min-width:0}
 #hwrap{overflow-x:auto; padding:8px 22px 26px}
 #hwrap .mon{cursor:pointer}
 #hwrap .mon:hover{color:var(--mauve)}
+#hside{width:230px; flex:0 0 230px; padding:10px 16px 20px 4px}
+#hside h3{font-family:'Fredoka'; font-weight:600; font-size:15px; color:var(--mauve); margin:6px 0}
+#hside .hnote{font-size:12px; color:var(--subtext0); margin-bottom:8px}
+#htemp{width:100%; box-sizing:border-box; background:var(--mantle); color:var(--text);
+  border:1px solid var(--surface1); border-radius:8px; padding:8px; font:inherit; font-size:13px; resize:vertical}
+#htempchips{display:flex; flex-wrap:wrap; gap:4px; margin:8px 0}
+.tchip{border:1px solid var(--surface1); border-radius:6px; padding:2px 7px; font-size:12px;
+  text-decoration:line-through; color:var(--overlay0); background:var(--mantle)}
+.tchip.unknown{text-decoration:none; color:var(--peach)}
+@media (max-width:860px){ #hordewrap{flex-direction:column} #hside{width:auto; flex:none; padding:0 22px 20px} }
 .locdrop{margin:0 0 4px}
 .locdrop>summary{cursor:pointer}
 .locdrop>summary:hover{filter:brightness(1.15)}
@@ -469,11 +481,22 @@ footer{
     <span class="tag" data-htime="Day">Day</span>
     <span class="tag" data-htime="Night">Night</span>
   </div>
-  <div id="hwrap">
-    <table>
-      <thead><tr id="hheadrow"></tr></thead>
-      <tbody id="htbody"></tbody>
-    </table>
+  <div id="hordewrap">
+    <div id="hmain">
+      <div id="hwrap">
+        <table>
+          <thead><tr id="hheadrow"></tr></thead>
+          <tbody id="htbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <aside id="hside">
+      <h3>Temp caught</h3>
+      <div class="hnote">Type mons to treat as caught while planning. They get crossed out and Adj Pts/Hit drops to their post-catch value. Comma or one per line. Saved in this browser only.</div>
+      <textarea id="htemp" rows="7" placeholder="Tentacool, Wingull"></textarea>
+      <div id="htempchips"></div>
+      <button class="smallbtn" id="htempclear">Clear list</button>
+    </aside>
   </div>
 </div>
 
@@ -1045,10 +1068,44 @@ const HCOLS = [
   {k:"horde",    label:"Horde", cls:"num", numeric:true},
   {k:"lv",       label:"Lv",    cls:"num", numeric:true},
   {k:"mons",     label:"Mons (split)", sortKey:"mon1"},
+  {k:"pts",      label:"Adj Pts/Hit", cls:"num", numeric:true},
 ];
 const H_TIMES = ["Morning","Day","Night"];
 let hordesBuilt = false, hordeRows = [], hSortCol = "location", hSortDir = 1;
 const hState = { q:"", region:"", size:"", season:"", time:"" };
+const SPTS = {"beldum":[58.0,50.0],"bulbasaur":[58.0,50.0],"charmander":[58.0,50.0],"chikorita":[58.0,50.0],"chimchar":[58.0,50.0],"cyndaquil":[58.0,50.0],"eevee":[58.0,50.0],"mudkip":[58.0,50.0],"oshawott":[58.0,50.0],"piplup":[58.0,50.0],"porygon":[58.0,50.0],"riolu":[58.0,50.0],"rotom":[58.0,50.0],"shedinja":[58.0,50.0],"snivy":[58.0,50.0],"snorlax":[58.0,50.0],"squirtle":[58.0,50.0],"tepig":[58.0,50.0],"togepi":[58.0,50.0],"torchic":[58.0,50.0],"totodile":[58.0,50.0],"treecko":[58.0,50.0],"turtwig":[58.0,50.0],"tyrogue":[58.0,50.0],"absol":[53.0,45.0],"alomomola":[53.0,45.0],"audino":[53.0,45.0],"burmy":[53.0,45.0],"carnivine":[53.0,45.0],"castform":[53.0,45.0],"chansey":[53.0,45.0],"cherubi":[53.0,45.0],"combee":[53.0,45.0],"drilbur":[53.0,45.0],"ducklett":[53.0,45.0],"emolga":[53.0,45.0],"gulpin":[53.0,45.0],"kangaskhan":[53.0,45.0],"larvesta":[53.0,45.0],"minun":[53.0,45.0],"panpour":[53.0,45.0],"pansage":[53.0,45.0],"pansear":[53.0,45.0],"pinsir":[53.0,45.0],"plusle":[53.0,45.0],"scyther":[53.0,45.0],"shroomish":[53.0,45.0],"skarmory":[53.0,45.0],"skitty":[53.0,45.0],"skorupi":[53.0,45.0],"slakoth":[53.0,45.0],"spiritomb":[53.0,45.0],"sudowoodo":[53.0,45.0],"aerodactyl":[48.0,40.0],"aipom":[48.0,40.0],"anorith":[48.0,40.0],"archen":[48.0,40.0],"bagon":[48.0,40.0],"clefairy":[48.0,40.0],"corsola":[48.0,40.0],"cranidos":[48.0,40.0],"feebas":[48.0,40.0],"houndour":[48.0,40.0],"kabuto":[48.0,40.0],"lapras":[48.0,40.0],"lileep":[48.0,40.0],"miltank":[48.0,40.0],"mr. mime":[48.0,40.0],"nincada":[48.0,40.0],"omanyte":[48.0,40.0],"pawniard":[48.0,40.0],"pineco":[48.0,40.0],"qwilfish":[48.0,40.0],"ralts":[48.0,40.0],"relicanth":[48.0,40.0],"shellder":[48.0,40.0],"shieldon":[48.0,40.0],"shuckle":[48.0,40.0],"tirtouga":[48.0,40.0],"zorua":[48.0,40.0],"barboach":[38.0,30.0],"cacnea":[38.0,30.0],"carvanha":[38.0,30.0],"chatot":[38.0,30.0],"chimeco":[38.0,30.0],"croagunk":[38.0,30.0],"cryogonal":[38.0,30.0],"darumaka":[38.0,30.0],"delibird":[38.0,30.0],"dratini":[38.0,30.0],"drifloon":[38.0,30.0],"exeggcute":[38.0,30.0],"farfetch'd":[38.0,30.0],"finneon":[38.0,30.0],"gible":[38.0,30.0],"gligar":[38.0,30.0],"growlithe":[38.0,30.0],"heracross":[38.0,30.0],"illumise":[38.0,30.0],"jynx":[38.0,30.0],"kecleon":[38.0,30.0],"ledyba":[38.0,30.0],"luvdisc":[38.0,30.0],"magmar":[38.0,30.0],"mantine":[38.0,30.0],"maractus":[38.0,30.0],"misdreavus":[38.0,30.0],"murkrow":[38.0,30.0],"nosepass":[38.0,30.0],"remoraid":[38.0,30.0],"sentret":[38.0,30.0],"seviper":[38.0,30.0],"sigilyph":[38.0,30.0],"staryu":[38.0,30.0],"stunky":[38.0,30.0],"sunkern":[38.0,30.0],"tauros":[38.0,30.0],"tropius":[38.0,30.0],"volbeat":[38.0,30.0],"vulpix":[38.0,30.0],"wailmer":[38.0,30.0],"yanma":[38.0,30.0],"zangoose":[38.0,30.0],"axew":[23.0,15.0],"bouffalant":[23.0,15.0],"buneary":[23.0,15.0],"corphish":[23.0,15.0],"deino":[23.0,15.0],"drowzee":[23.0,15.0],"electabuzz":[23.0,15.0],"heatmor":[23.0,15.0],"hoothoot":[23.0,15.0],"kricketot":[23.0,15.0],"larvitar":[23.0,15.0],"lotad":[23.0,15.0],"lunatone":[23.0,15.0],"meowth":[23.0,15.0],"oddish":[23.0,15.0],"pachirisu":[23.0,15.0],"pidove":[23.0,15.0],"purrloin":[23.0,15.0],"rufflet":[23.0,15.0],"scraggy":[23.0,15.0],"sneasel":[23.0,15.0],"snubbull":[23.0,15.0],"spinarak":[23.0,15.0],"spinda":[23.0,15.0],"surskit":[23.0,15.0],"trapinch":[23.0,15.0],"venonat":[23.0,15.0],"wooper":[23.0,15.0],"bellsprout":[18.0,10.0],"caterpie":[18.0,10.0],"cottonee":[18.0,10.0],"cubchoo":[18.0,10.0],"dwebble":[18.0,10.0],"ferroseed":[18.0,10.0],"foongus":[18.0,10.0],"hippopotas":[18.0,10.0],"hoppip":[18.0,10.0],"horsea":[18.0,10.0],"jigglypuff":[18.0,10.0],"joltik":[18.0,10.0],"karrablast":[18.0,10.0],"lillipup":[18.0,10.0],"natu":[18.0,10.0],"nidoran m":[18.0,10.0],"numel":[18.0,10.0],"paras":[18.0,10.0],"petilil":[18.0,10.0],"pikachu":[18.0,10.0],"sawk":[18.0,10.0],"shelmet":[18.0,10.0],"snorunt":[18.0,10.0],"starly":[18.0,10.0],"swablu":[18.0,10.0],"taillow":[18.0,10.0],"teddiursa":[18.0,10.0],"throh":[18.0,10.0],"timburr":[18.0,10.0],"trubbish":[18.0,10.0],"tynamo":[18.0,10.0],"venipede":[18.0,10.0],"weedle":[18.0,10.0],"wurmple":[18.0,10.0],"abra":[13.0,5.0],"aron":[13.0,5.0],"bidoof":[13.0,5.0],"blitzle":[13.0,5.0],"chinchou":[13.0,5.0],"clamperl":[13.0,5.0],"cubone":[13.0,5.0],"diglett":[13.0,5.0],"ditto":[13.0,5.0],"doduo":[13.0,5.0],"druddigon":[13.0,5.0],"durant":[13.0,5.0],"ekans":[13.0,5.0],"electrike":[13.0,5.0],"elgyem":[13.0,5.0],"gothita":[13.0,5.0],"grimer":[13.0,5.0],"klink":[13.0,5.0],"lickitung":[13.0,5.0],"makuhita":[13.0,5.0],"mankey":[13.0,5.0],"mareep":[13.0,5.0],"mawile":[13.0,5.0],"minccino":[13.0,5.0],"munna":[13.0,5.0],"nidoran f":[13.0,5.0],"patrat":[13.0,5.0],"phanpy":[13.0,5.0],"pidgey":[13.0,5.0],"ponyta":[13.0,5.0],"poochyena":[13.0,5.0],"roggenrola":[13.0,5.0],"roselia":[13.0,5.0],"sableye":[13.0,5.0],"sewaddle":[13.0,5.0],"shinx":[13.0,5.0],"slugma":[13.0,5.0],"snover":[13.0,5.0],"solosis":[13.0,5.0],"solrock":[13.0,5.0],"spearow":[13.0,5.0],"spoink":[13.0,5.0],"stantler":[13.0,5.0],"stunfisk":[13.0,5.0],"tangela":[13.0,5.0],"tympole":[13.0,5.0],"vanillite":[13.0,5.0],"vullaby":[13.0,5.0],"whismur":[13.0,5.0],"wingull":[13.0,5.0],"woobat":[13.0,5.0],"zigzagoon":[13.0,5.0],"baltoy":[11.0,3.0],"basculin":[11.0,3.0],"bronzor":[11.0,3.0],"buizel":[11.0,3.0],"deerling":[11.0,3.0],"dunsparce":[11.0,3.0],"duskull":[11.0,3.0],"frillish":[11.0,3.0],"gastly":[11.0,3.0],"geodude":[11.0,3.0],"girafarig":[11.0,3.0],"glameow":[11.0,3.0],"goldeen":[11.0,3.0],"golett":[11.0,3.0],"koffing":[11.0,3.0],"krabby":[11.0,3.0],"litwick":[11.0,3.0],"machop":[11.0,3.0],"magikarp":[11.0,3.0],"magnemite":[11.0,3.0],"marill":[11.0,3.0],"meditite":[11.0,3.0],"mienfoo":[11.0,3.0],"onix":[11.0,3.0],"poliwag":[11.0,3.0],"psyduck":[11.0,3.0],"rattata":[11.0,3.0],"rhyhorn":[11.0,3.0],"sandile":[11.0,3.0],"sandshrew":[11.0,3.0],"seedot":[11.0,3.0],"seel":[11.0,3.0],"shellos":[11.0,3.0],"shuppet":[11.0,3.0],"slowpoke":[11.0,3.0],"smeargle":[11.0,3.0],"spheal":[11.0,3.0],"swinub":[11.0,3.0],"tentacool":[11.0,3.0],"torkoal":[11.0,3.0],"unown":[11.0,3.0],"voltorb":[11.0,3.0],"wobbuffet":[11.0,3.0],"yamask":[11.0,3.0],"zubat":[11.0,3.0],"abomasnow":[13.0,5.0],"altaria":[18.0,10.0],"amoonguss":[18.0,10.0],"arbok":[13.0,5.0],"ariados":[23.0,15.0],"azumarill":[11.0,3.0],"banette":[11.0,3.0],"beartic":[18.0,10.0],"beautifly":[18.0,10.0],"beedrill":[18.0,10.0],"beheeyem":[13.0,5.0],"bibarel":[13.0,5.0],"boldore":[13.0,5.0],"braviary":[23.0,15.0],"bronzong":[11.0,3.0],"budew":[13.0,5.0],"butterfree":[18.0,10.0],"cacturne":[38.0,30.0],"camerupt":[18.0,10.0],"cascoon":[18.0,10.0],"chimecho":[38.0,30.0],"claydol":[11.0,3.0],"cofagrigus":[11.0,3.0],"crustle":[18.0,10.0],"dewgong":[11.0,3.0],"dodrio":[13.0,5.0],"donphan":[13.0,5.0],"drifblim":[38.0,30.0],"dugtrio":[13.0,5.0],"duosion":[13.0,5.0],"dusclops":[11.0,3.0],"dustox":[18.0,10.0],"electrode":[11.0,3.0],"fearow":[13.0,5.0],"flaaffy":[13.0,5.0],"floatzel":[11.0,3.0],"fraxure":[23.0,15.0],"furret":[38.0,30.0],"gabite":[38.0,30.0],"garbodor":[18.0,10.0],"gastrodon":[11.0,3.0],"glalie":[18.0,10.0],"gloom":[23.0,15.0],"golbat":[11.0,3.0],"golduck":[11.0,3.0],"gothorita":[13.0,5.0],"graveler":[11.0,3.0],"gurdurr":[18.0,10.0],"gyarados":[11.0,3.0],"hariyama":[13.0,5.0],"haunter":[11.0,3.0],"herdier":[18.0,10.0],"hippowdon":[18.0,10.0],"hypno":[23.0,15.0],"kadabra":[13.0,5.0],"kakuna":[18.0,10.0],"kingler":[11.0,3.0],"kricketune":[23.0,15.0],"krokorok":[11.0,3.0],"lairon":[13.0,5.0],"lanturn":[13.0,5.0],"ledian":[38.0,30.0],"liepard":[23.0,15.0],"linoone":[13.0,5.0],"lombre":[23.0,15.0],"loudred":[13.0,5.0],"luxio":[13.0,5.0],"machoke":[11.0,3.0],"magby":[38.0,30.0],"magcargo":[13.0,5.0],"magneton":[11.0,3.0],"mandibuzz":[13.0,5.0],"manectric":[13.0,5.0],"marowak":[13.0,5.0],"masquerain":[23.0,15.0],"medicham":[11.0,3.0],"metapod":[18.0,10.0],"mienshao":[11.0,3.0],"mightyena":[13.0,5.0],"muk":[13.0,5.0],"nidoran♀":[13.0,5.0],"nidoran♂":[18.0,10.0],"nidorina":[13.0,5.0],"nidorino":[18.0,10.0],"noctowl":[23.0,15.0],"nuzleaf":[11.0,3.0],"palpitoad":[13.0,5.0],"parasect":[18.0,10.0],"pelipper":[13.0,5.0],"persian":[23.0,15.0],"pidgeotto":[13.0,5.0],"piloswine":[11.0,3.0],"poliwhirl":[11.0,3.0],"primeape":[13.0,5.0],"pupitar":[23.0,15.0],"purugly":[11.0,3.0],"quagsire":[23.0,15.0],"rapidash":[13.0,5.0],"raticate":[11.0,3.0],"rhydon":[11.0,3.0],"sandslash":[11.0,3.0],"sawsbuck":[11.0,3.0],"scrafty":[23.0,15.0],"seaking":[11.0,3.0],"sealeo":[11.0,3.0],"silcoon":[18.0,10.0],"skiploom":[18.0,10.0],"skuntank":[38.0,30.0],"slowbro":[11.0,3.0],"staravia":[18.0,10.0],"steelix":[11.0,3.0],"swadloon":[13.0,5.0],"swellow":[18.0,10.0],"tentacruel":[11.0,3.0],"tranquill":[23.0,15.0],"ursaring":[18.0,10.0],"vanillish":[13.0,5.0],"venomoth":[23.0,15.0],"watchog":[13.0,5.0],"weepinbell":[18.0,10.0],"weezing":[11.0,3.0],"whirlipede":[18.0,10.0],"xatu":[18.0,10.0],"zebstrika":[13.0,5.0]};
+/* temp-caught scratch list: crossed out + points drop to post-catch value */
+let tempCaught = new Set();
+function loadTempCaught(){
+  const raw = store.get("mew-hordes-temp") || "";
+  tempCaught = new Set(raw.split(/[,\n]/).map(s => s.trim().toLowerCase()).filter(Boolean));
+  return raw;
+}
+function isGone(name){
+  const n = name.toLowerCase();
+  return caughtSet.has(n) || tempCaught.has(n);
+}
+function ptsFor(name){
+  const e = SPTS[name.toLowerCase()];
+  if (!e) return null;
+  return isGone(name) ? e[1] : e[0];
+}
+function rowPts(r){
+  let sum = 0, any = false;
+  for (const m of r.mons){
+    const p = ptsFor(m.name);
+    if (p != null && m.split != null){ sum += m.split / 100 * p; any = true; }
+  }
+  return any ? sum : null;
+}
+function renderTempChips(){
+  const dexNames = new Set(DEX.mons.map(m => m[1].toLowerCase()));
+  $("#htempchips").innerHTML = [...tempCaught].map(n => {
+    const known = dexNames.has(n) || SPTS[n];
+    const label = n.replace(/\b\w/g, c => c.toUpperCase());
+    return `<span class="tchip${known ? "" : " unknown"}"${known ? "" : ' title="Name not recognized"'}>${label}${known ? "" : " ?"}</span>`;
+  }).join("");
+}
 function buildHordes(){
   hordesBuilt = true;
   const groups = new Map();
@@ -1122,16 +1179,28 @@ function buildHordes(){
     document.querySelectorAll("[data-htime]").forEach(c => c.classList.toggle("on", c === ch));
     renderHordes();
   });
+  $("#htemp").value = loadTempCaught();
+  $("#htemp").oninput = e => {
+    store.set("mew-hordes-temp", e.target.value);
+    loadTempCaught(); renderTempChips(); renderHordes();
+  };
+  $("#htempclear").onclick = () => {
+    store.set("mew-hordes-temp", "");
+    $("#htemp").value = ""; loadTempCaught(); renderTempChips(); renderHordes();
+  };
+  renderTempChips();
   renderHordes();
 }
 function hMonsHTML(r){
   return r.mons.map(m => {
-    const gone = caughtSet.has(m.name.toLowerCase());
+    const gone = isGone(m.name);
+    const temp = tempCaught.has(m.name.toLowerCase());
     const pc = m.split != null ? `${+m.split.toFixed(1)}%` : (m.rlabel || "");
-    return `<span class="mon${gone ? " gone" : ""}" data-id="${m.id}"${gone ? ' title="Already caught | unique bonus spent"' : ""}>${m.name}${pc ? ` <span class="pc">${pc}</span>` : ""}</span>`;
+    return `<span class="mon${gone ? " gone" : ""}" data-id="${m.id}"${gone ? ` title="${temp ? "Temporarily marked caught" : "Already caught | unique bonus spent"}"` : ""}>${m.name}${pc ? ` <span class="pc">${pc}</span>` : ""}</span>`;
   }).join(" · ");
 }
 function renderHordes(){
+  for (const r of hordeRows) r.pts = rowPts(r);
   const rows = hordeRows.filter(r =>
     (hState.region === "" || r.regionIdx === +hState.region) &&
     (hState.size === "" || r.horde === +hState.size) &&
@@ -1166,6 +1235,7 @@ function renderHordes(){
       <td class="num">${r.horde}x</td>
       <td class="num">${r.lvText}</td>
       <td>${hMonsHTML(r)}</td>
+      <td class="num">${r.pts == null ? "" : fmt(r.pts, 1)}</td>
     </tr>`).join("");
   document.querySelectorAll("#htbody .mon").forEach(c => c.onclick = () => openDetail(+c.dataset.id));
 }
