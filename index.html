@@ -346,7 +346,10 @@ footer{
   width:76px; background:var(--base); border:1px solid var(--surface1); color:var(--yellow);
   font-weight:800; font-family:'Nunito'; font-size:13.5px; border-radius:6px; padding:3px 8px; text-align:center;
 }
-#hlvmin, #hlvmax{width:110px; accent-color:var(--mauve); vertical-align:middle}
+#hlvmin, #hlvmax{
+  width:58px; background:var(--base); border:1px solid var(--surface1); color:var(--yellow);
+  font-weight:800; font-family:'Nunito'; font-size:13.5px; border-radius:6px; padding:3px 8px; text-align:center;
+}
 @media (max-width:860px){ #hordewrap{flex-direction:column} #hside{width:auto; flex:none; padding:0 22px 20px} }
 .locdrop{margin:0 0 4px}
 .locdrop>summary{cursor:pointer}
@@ -496,9 +499,9 @@ footer{
     <label style="margin-left:14px" title="Hordes per hour used for EV/Hour">Hordes/h</label>
     <input id="hrate" type="number" min="1" step="10">
     <label style="margin-left:14px">Lv</label>
-    <input id="hlvmin" type="range">
-    <input id="hlvmax" type="range">
-    <span class="count" id="hlvlabel"></span>
+    <input id="hlvmin" type="number" min="1" max="100" step="1">
+    <span>to</span>
+    <input id="hlvmax" type="number" min="1" max="100" step="1">
   </div>
   <div id="hordewrap">
     <div id="hmain">
@@ -1226,20 +1229,15 @@ function buildHordes(){
     store.set("mew-hordes-rate", e.target.value);
     renderHordes();
   };
-  /* level range sliders (full 1-100 range) */
-  const lvLo = 1, lvHi = 100;
-  hState.lvMin = lvLo; hState.lvMax = lvHi;
-  for (const [id, val] of [["#hlvmin", lvLo], ["#hlvmax", lvHi]]){
-    const el = $(id); el.min = lvLo; el.max = lvHi; el.value = val;
-  }
+  /* level range number inputs (1-100) */
+  hState.lvMin = 1; hState.lvMax = 100;
+  $("#hlvmin").value = 1; $("#hlvmax").value = 100;
   const updLv = () => {
-    const a = +$("#hlvmin").value, b = +$("#hlvmax").value;
+    const a = num($("#hlvmin").value) ?? 1, b = num($("#hlvmax").value) ?? 100;
     hState.lvMin = Math.min(a, b); hState.lvMax = Math.max(a, b);
-    $("#hlvlabel").textContent = "Lv " + hState.lvMin + "\u2013" + hState.lvMax;
     renderHordes();
   };
   $("#hlvmin").oninput = updLv; $("#hlvmax").oninput = updLv;
-  $("#hlvlabel").textContent = "Lv " + lvLo + "\u2013" + lvHi;
   renderHEggs();
   document.querySelectorAll("[data-hseason]").forEach(ch => ch.onclick = () => {
     hState.season = ch.dataset.hseason;
