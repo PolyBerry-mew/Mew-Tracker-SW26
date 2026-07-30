@@ -325,13 +325,13 @@ footer{
 .movesec h4{margin:10px 0 2px;font-size:13px}
 .movesec details summary{cursor:pointer;font-size:13px;font-weight:700;margin:10px 0 2px}
 /* ---- hordes view ---- */
-#hordeview{padding:0 4px}
-#htbl{width:100%;border-collapse:collapse;font-size:13px}
-#htbl th{text-align:left;padding:6px 8px;position:sticky;top:0;background:var(--surface0);color:var(--subtext1)}
-#htbl td{padding:4px 8px;border-top:1px solid var(--surface1);white-space:nowrap}
-#htbl img{width:32px;height:32px;image-rendering:pixelated;vertical-align:middle;margin-right:4px}
-#htbl .hmon{cursor:pointer;font-weight:600}
-#htbl .hmon:hover{color:var(--mauve)}
+#hwrap{overflow-x:auto; padding:8px 22px 26px}
+#hwrap .mon{cursor:pointer}
+#hwrap .mon:hover{color:var(--mauve)}
+.locdrop{margin:0 0 4px}
+.locdrop>summary{cursor:pointer}
+.locdrop>summary:hover{filter:brightness(1.15)}
+.locdrop>summary .cnt{color:var(--overlay1);font-size:12px;font-weight:600;margin-left:6px}
 /* ---- seasonal / altering cave popup ---- */
 #quickbar{margin:4px 0 8px}
 #sovl{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:61;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:34px 14px}
@@ -456,11 +456,11 @@ footer{
     <select class="tag" id="hsize"><option value="">Any size</option><option value="3">3x</option><option value="5">5x</option></select>
     <span class="count" id="hcount"></span>
   </div>
-  <div style="overflow:auto">
-  <table id="htbl">
-    <thead><tr><th>Region</th><th>Location</th><th>Pokémon</th><th>Size</th><th>Method</th><th>Lv</th><th>Morning</th><th>Day</th><th>Night</th><th>Season</th></tr></thead>
-    <tbody id="htbody"></tbody>
-  </table>
+  <div id="hwrap">
+    <table>
+      <thead><tr id="hheadrow"></tr></thead>
+      <tbody id="htbody"></tbody>
+    </table>
   </div>
 </div>
 
@@ -917,11 +917,13 @@ function openDetail(id){
         <td class="seas">${seasonText(sm)}</td>
       </tr>`;
     }).join("");
-    return `<div class="regionlbl rg-${DEX.regions[ri]}">${DEX.regions[ri]}</div>
+    return `<details class="locdrop" open>
+      <summary><span class="regionlbl rg-${DEX.regions[ri]}" style="display:inline-block">${DEX.regions[ri]}</span><span class="cnt">${list.length} spawn${list.length === 1 ? "" : "s"}</span></summary>
       <table class="loctbl">
         <thead><tr><th>Location</th><th>Method</th><th>Lv</th><th>Morning</th><th>Day</th><th>Night</th><th>Season</th></tr></thead>
         <tbody>${rows}</tbody>
-      </table>`;
+      </table>
+    </details>`;
   }).join("") : `<div class="nowild-big">No wild encounters | this one comes from evolution, breeding, events, or special means.</div>`;
 
   $("#dcontent").innerHTML = `
@@ -1017,17 +1019,50 @@ function movesHTML(id, tys){
   </div>`;
 }
 
-/* ---- Hordes view (raw dump, no ranking / live season logic) ---- */
-let hordesBuilt = false, hordeRows = [];
+/* ---- Hordes view: raw game-data horde dump in the route-page format.
+   Same table styling and click-to-sort headers, no live rank.
+   Split = each mon's encounter % within the horde location (day rate,
+   falling back to morning/night), shown route-page style. ---- */
+const HCOLS = [
+  {k:"location", label:"Location", cls:"loc"},
+  {k:"region",   label:"Region"},
+  {k:"method",   label:"Method"},
+  {k:"season",   label:"Season"},
+  {k:"time",     label:"Time"},
+  {k:"horde",    label:"Horde", cls:"num", numeric:true},
+  {k:"lv",       label:"Lv",    cls:"num", numeric:true},
+  {k:"mons",     label:"Mons (split)", sortKey:"mon1"},
+];
+let hordesBuilt = false, hordeRows = [], hSortCol = "location", hSortDir = 1;
 const hState = { q:"", region:"", size:"" };
 function buildHordes(){
   hordesBuilt = true;
+  const groups = new Map();
+  const pctOf = ri => { if (ri < 0) return null; const n = parseFloat(DEX.rarities[ri]); return isNaN(n) ? null : n; };
   for (const m of DEX.mons)
     for (const L of m[8])
-      if (L[5]) hordeRows.push({ id:m[0], name:m[1], tys:m[2],
-        region:L[0], loc:DEX.locs[L[1]], method:DEX.methods[L[2]],
-        mn:L[3], mx:L[4], h:L[5], rm:L[6], rd:L[7], rn:L[8], sm:L[9] });
-  hordeRows.sort((a,b) => a.region - b.region || a.loc.localeCompare(b.loc) || a.name.localeCompare(b.name));
+      if (L[5]){
+        const key = L[0] + "|" + L[1] + "|" + L[2] + "|" + L[5];
+        if (!groups.has(key)) groups.set(key, { ri:L[0], li:L[1], mi:L[2], h:L[5],
+          mons:[], mn:999, mx:0, sm:0, tm:[false,false,false] });
+        const g = groups.get(key);
+        const best = L[7] >= 0 ? L[7] : (L[6] >= 0 ? L[6] : L[8]);
+        g.mons.push({ id:m[0], name:m[1], split:pctOf(best), rlabel:best >= 0 ? DEX.rarities[best] : "" });
+        g.mn = Math.min(g.mn, L[3]); g.mx = Math.max(g.mx, L[4]); g.sm |= L[9];
+        if (L[6] >= 0) g.tm[0] = true; if (L[7] >= 0) g.tm[1] = true; if (L[8] >= 0) g.tm[2] = true;
+      }
+  hordeRows = [...groups.values()].map(g => {
+    g.mons.sort((a,b) => (b.split ?? -1) - (a.split ?? -1) || a.name.localeCompare(b.name));
+    const t = g.tm;
+    return {
+      location: DEX.locs[g.li], region: DEX.regions[g.ri], regionIdx: g.ri,
+      method: DEX.methods[g.mi], horde: g.h,
+      lv: g.mn, lvText: g.mn === g.mx ? String(g.mn) : g.mn + "\u2013" + g.mx,
+      season: (g.sm === 15 ? "All Seasons" : seasonText(g.sm)),
+      time: (t[0] && t[1] && t[2]) ? "All Day" : [t[0] && "Morning", t[1] && "Day", t[2] && "Night"].filter(Boolean).join("/"),
+      mons: g.mons, mon1: g.mons[0] ? g.mons[0].name : "",
+    };
+  });
   $("#hregion").innerHTML = '<option value="">Any region</option>' +
     DEX.regions.map((r,i) => `<option value="${i}">${r}</option>`).join("");
   $("#hsearch").oninput = e => { hState.q = e.target.value.trim().toLowerCase(); renderHordes(); };
@@ -1035,23 +1070,48 @@ function buildHordes(){
   $("#hsize").onchange = e => { hState.size = e.target.value; renderHordes(); };
   renderHordes();
 }
+function hMonsHTML(r){
+  return r.mons.map(m => {
+    const gone = caughtSet.has(m.name.toLowerCase());
+    const pc = m.split != null ? `${+m.split.toFixed(1)}%` : (m.rlabel || "");
+    return `<span class="mon${gone ? " gone" : ""}" data-id="${m.id}"${gone ? ' title="Already caught | unique bonus spent"' : ""}>${m.name}${pc ? ` <span class="pc">${pc}</span>` : ""}</span>`;
+  }).join(" · ");
+}
 function renderHordes(){
   const rows = hordeRows.filter(r =>
-    (hState.region === "" || r.region === +hState.region) &&
-    (hState.size === "" || r.h === +hState.size) &&
-    (!hState.q || r.name.toLowerCase().includes(hState.q) || r.loc.toLowerCase().includes(hState.q)));
-  $("#hcount").textContent = rows.length + " horde spawns";
+    (hState.region === "" || r.regionIdx === +hState.region) &&
+    (hState.size === "" || r.horde === +hState.size) &&
+    (!hState.q || r.location.toLowerCase().includes(hState.q) ||
+      r.mons.some(m => m.name.toLowerCase().includes(hState.q))));
+  const col = HCOLS.find(c => c.k === hSortCol) || HCOLS[0];
+  const key = col.sortKey || col.k;
+  rows.sort((a,b) => {
+    let x = a[key], y = b[key];
+    const bx = x == null || x === "", by = y == null || y === "";
+    if (bx && by) return 0; if (bx) return 1; if (by) return -1;
+    if (col.numeric || typeof x === "number") return (x - y) * hSortDir;
+    return String(x).localeCompare(String(y)) * hSortDir;
+  });
+  $("#hheadrow").innerHTML = HCOLS.map(c =>
+    `<th data-k="${c.k}">${c.label}${c.k === hSortCol ? `<span class="arr">${hSortDir < 0 ? "\u25bc" : "\u25b2"}</span>` : ""}</th>`).join("");
+  document.querySelectorAll("#hheadrow th").forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    if (hSortCol === k) hSortDir *= -1;
+    else { hSortCol = k; hSortDir = HCOLS.find(c => c.k === k)?.numeric ? -1 : 1; }
+    renderHordes();
+  });
+  $("#hcount").textContent = rows.length + " horde spots";
   $("#htbody").innerHTML = rows.map(r => `<tr>
-    <td>${DEX.regions[r.region]}</td>
-    <td>${r.loc}</td>
-    <td class="hmon" data-id="${r.id}"><img loading="lazy" src="https://play.pokemonshowdown.com/sprites/gen5/${slug(r.name)}.png" onerror="this.style.visibility='hidden'">${r.name}</td>
-    <td>${r.h}x</td>
-    <td>${r.method}</td>
-    <td>${r.mn === r.mx ? r.mn : r.mn + "–" + r.mx}</td>
-    <td>${rarName(r.rm)}</td><td>${rarName(r.rd)}</td><td>${rarName(r.rn)}</td>
-    <td>${seasonText(r.sm)}</td>
-  </tr>`).join("");
-  document.querySelectorAll("#htbody .hmon").forEach(c => c.onclick = () => openDetail(+c.dataset.id));
+      <td class="loc">${r.location}</td>
+      <td>${r.region}</td>
+      <td>${r.method}</td>
+      <td>${r.season}</td>
+      <td>${r.time}</td>
+      <td class="num">${r.horde}x</td>
+      <td class="num">${r.lvText}</td>
+      <td>${hMonsHTML(r)}</td>
+    </tr>`).join("");
+  document.querySelectorAll("#htbody .mon").forEach(c => c.onclick = () => openDetail(+c.dataset.id));
 }
 
 /* ---- Seasonal picks + Altering Cave popup (route page) ----
