@@ -1071,8 +1071,8 @@ function buildHordes(){
         if (!pool.length) continue;
         const sig = pool.map(e => e.id + ":" + e.rar[t]).sort().join(",");
         if (!variants.has(sig))
-          variants.set(sig, { items: pool.map(e => ({ id:e.id, name:e.name, ri:e.rar[t], mn:e.mn, mx:e.mx })), sm:0, tm:new Set() });
-        const v = variants.get(sig); v.sm |= 1 << s; v.tm.add(t);
+          variants.set(sig, { items: pool.map(e => ({ id:e.id, name:e.name, ri:e.rar[t], mn:e.mn, mx:e.mx })), slots:[] });
+        variants.get(sig).slots.push([s, t]);
       }
     for (const v of variants.values()){
       const raws = v.items.map(it => pctOf(it.ri));
@@ -1083,14 +1083,28 @@ function buildHordes(){
         rlabel: DEX.rarities[it.ri],
       })).sort((a,b) => (b.split ?? -1) - (a.split ?? -1) || a.name.localeCompare(b.name));
       const mn = Math.min(...v.items.map(it => it.mn)), mx = Math.max(...v.items.map(it => it.mx));
-      hordeRows.push({
-        location: DEX.locs[g.li], region: DEX.regions[g.ri], regionIdx: g.ri,
-        method: DEX.methods[g.mi], horde: g.h,
-        lv: mn, lvText: mn === mx ? String(mn) : mn + "\u2013" + mx,
-        season: v.sm === 15 ? "All Seasons" : seasonText(v.sm),
-        time: v.tm.size === 3 ? "All Day" : [...v.tm].sort().map(i => H_TIMES[i]).join("/"),
-        mons, mon1: mons[0] ? mons[0].name : "",
-      });
+      /* merge only clean season x time rectangles, so a pool that runs
+         all day in Summer but night-only in Spring stays two rows */
+      const perSeason = new Map();
+      for (const [s,t] of v.slots){
+        if (!perSeason.has(s)) perSeason.set(s, new Set());
+        perSeason.get(s).add(t);
+      }
+      const byTimes = new Map();
+      for (const [s,ts] of perSeason){
+        const key = [...ts].sort().join("");
+        if (!byTimes.has(key)) byTimes.set(key, { sm:0, ts });
+        byTimes.get(key).sm |= 1 << s;
+      }
+      for (const { sm, ts } of byTimes.values())
+        hordeRows.push({
+          location: DEX.locs[g.li], region: DEX.regions[g.ri], regionIdx: g.ri,
+          method: DEX.methods[g.mi], horde: g.h,
+          lv: mn, lvText: mn === mx ? String(mn) : mn + "\u2013" + mx,
+          season: sm === 15 ? "All Seasons" : seasonText(sm),
+          time: ts.size === 3 ? "All Day" : [...ts].sort().map(i => H_TIMES[i]).join("/"),
+          mons, mon1: mons[0] ? mons[0].name : "",
+        });
     }
   }
   $("#hregion").innerHTML = '<option value="">Any region</option>' +
