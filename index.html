@@ -881,7 +881,7 @@ function renderDex(){
       ${m[8].length ? "" : '<span class="nowild" title="No wild encounter">not wild</span>'}
       <img loading="lazy" src="https://play.pokemonshowdown.com/sprites/gen5/${slug(m[1])}.png" alt="" onerror="this.style.visibility='hidden'">
       <div class="nm">${m[1]}</div>
-      <div class="typerow">${m[2].map(t=>`<span class="ty ty-${t}">${t}</span>`).join("")}</div>
+      <div class="typerow">${[...new Set(m[2])].map(t=>`<span class="ty ty-${t}">${t}</span>`).join("")}</div>
     </div>`).join("");
   document.querySelectorAll(".dcard").forEach(c => c.onclick = () => openDetail(+c.dataset.id));
 }
@@ -932,7 +932,7 @@ function openDetail(id){
       <img src="https://play.pokemonshowdown.com/sprites/gen5-shiny/${slug(name)}.png" alt="" title="Shiny" onerror="this.style.display='none'">
       <div>
         <div><span class="no">#${m[0]}</span><span class="big">${name}</span></div>
-        <div class="typerow" style="justify-content:flex-start">${tys.map(t=>`<span class="ty ty-${t}">${t}</span>`).join("")}</div>
+        <div class="typerow" style="justify-content:flex-start">${[...new Set(tys)].map(t=>`<span class="ty ty-${t}">${t}</span>`).join("")}</div>
         <div class="dmeta">${extra}</div>
       </div>
     </div>
