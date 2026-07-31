@@ -413,7 +413,7 @@ footer{
         <label>Region</label>
         <select class="tag" id="regionsel"><option value="">All</option></select>
         <span class="tag" id="freshonly">Fresh only</span>
-        <span class="tag" id="worthonly">Worth it</span>
+        <span class="tag on" id="worthonly">Worth it</span>
         <span class="tag" id="hazardonly">Has warning</span>
         <input id="search" type="search" placeholder="Search location, mon, notes">
         <span class="count" id="count"></span>
@@ -649,7 +649,7 @@ const COLS = [
   {k:"warnings",   label:"Warnings"},
 ];
 let routeRows = [], sortCol = "ev_per_hour", sortDir = -1;
-let filters = { region:"", fresh:false, worth:false, hazard:false, q:"", season:"", time:"" };
+let filters = { region:"", fresh:false, worth:true, hazard:false, q:"", season:"", time:"" };
 /* row season/time tags are like "Spring/Summer", "All Seasons", "Morning/Day", "All Day" */
 function tagMatch(tag, want, allWord){
   if (!want) return true;
