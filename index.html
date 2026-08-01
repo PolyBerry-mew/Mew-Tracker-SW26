@@ -1416,30 +1416,11 @@ function renderSeasonal(){
       <tbody>${seasRows}</tbody>
     </table>
     <h2 style="margin:18px 0 4px">Altering Cave</h2>
-    <div style="font-size:13px;opacity:.8">Rotates every 6 hours (one in-game day). Tap the rotation currently up. The previous one is remembered automatically.</div>
-    <div style="margin:8px 0 2px">${ALTCAVE.order.map(r =>
-      `<button class="smallbtn rotbtn${st.cur === r ? " cur" : ""}" data-rot="${r}">${r}</button>`).join("")}</div>
-    <div class="lhbox"><h4 style="margin:10px 0 4px">Live Hordes <span class="lhnote">(manual — copy/paste from the Altering Cave sheet, saved on this device)</span></h4>
-      <div id="lhedit" class="lharea" contenteditable="plaintext-only" spellcheck="false"></div></div>
-    <div class="accols">
-      <div class="accol"><h4>Current${st.cur ? " · " + st.cur : ""}</h4><div>${rotListHTML(st.cur)}</div></div>
-      <div class="accol"><h4>Previous${st.prev ? " · " + st.prev : ""}</h4><div>${rotListHTML(st.prev)}</div></div>
-    </div>
-    <details style="margin-top:12px"><summary>All known rotations</summary>
-      <div class="accols">${ALTCAVE.order.map(r =>
-        `<div class="accol"><h4>${r}</h4><div>${rotListHTML(r)}</div></div>`).join("")}</div>
-    </details>`;
+    <div style="font-size:13px;opacity:.8">Rotations &amp; live hordes are tracked separately in the Altering Cave doc.</div>
+    <div style="margin:10px 0 2px"><a class="smallbtn" style="display:inline-block;text-decoration:none"
+      href="https://docs.google.com/spreadsheets/d/12lZupylxLAKUVQQJZIC8GJmvQiUwpbAAQ3BduAu_rig/edit?usp=sharing"
+      target="_blank" rel="noopener">Open the Altering Cave doc &#8599;</a></div>`;
   document.querySelectorAll("#scontent [data-seas]").forEach(t => t.onclick = () => { seasonPick = t.dataset.seas; renderSeasonal(); });
-  document.querySelectorAll("#scontent [data-rot]").forEach(b => b.onclick = () => {
-    const st2 = acStore.get();
-    if (st2.cur !== b.dataset.rot) acStore.set({ cur:b.dataset.rot, prev:st2.cur || null, ts:Date.now() });
-    renderSeasonal();
-  });
-  const lh = $("#lhedit");
-  if (lh){
-    try { lh.textContent = localStorage.getItem("mew-althordes") || ""; } catch(e){}
-    lh.oninput = () => { try { localStorage.setItem("mew-althordes", lh.textContent); } catch(e){} };
-  }
 }
 function openSeasonal(){ $("#sovl").classList.add("open"); renderSeasonal(); loadSeasonalSheet(); }
 function closeSeasonal(){ $("#sovl").classList.remove("open"); }
