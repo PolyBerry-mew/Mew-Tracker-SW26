@@ -168,6 +168,9 @@ td.warn{color:var(--peach); font-size:12.5px; max-width:200px}
 .st::before{content:"●"; margin-right:5px; font-size:9px; vertical-align:1px}
 .st-fresh{color:var(--green)} .st-hit{color:var(--peach)} .st-out{color:var(--red)} .st-other{color:var(--overlay2)}
 .w-yes{color:var(--green); font-weight:800} .w-no{color:var(--overlay1)}
+.w-always{color:var(--crust); background:var(--yellow); font-weight:800; padding:1px 7px; border-radius:999px; font-size:12px; white-space:nowrap}
+tr.pinned td{background:color-mix(in srgb, var(--yellow) 9%, transparent)}
+tr.pinned td.rank::before{content:"\1F4CC"; margin-right:5px; font-size:11px}
 
 /* notices */
 .notice{
@@ -420,6 +423,7 @@ footer{
         <select class="tag" id="regionsel"><option value="">All</option></select>
         <span class="tag" id="freshonly">Fresh only</span>
         <span class="tag on" id="worthonly">Worth it</span>
+        <span class="tag" id="alwaysonly" title="Only the spots pinned with Worth? = Always">&#128204; Always</span>
         <span class="tag" id="hazardonly">Has warning</span>
         <input id="search" type="search" placeholder="Search location, mon, notes">
         <span class="count" id="count"></span>
@@ -654,8 +658,13 @@ const COLS = [
   {k:"data_notes", label:"Notes"},
   {k:"warnings",   label:"Warnings"},
 ];
-let routeRows = [], sortCol = "ev_per_hour", sortDir = -1;
-let filters = { region:"", fresh:false, worth:true, hazard:false, q:"", season:"", time:"" };
+/* Worth? is Yes / No / Always. "Always" spots carry the Always Bonus from the
+   sheet, which is baked into Live Rank only - never into EV/Hour. Default sort is
+   Live Rank so the site shows the same route order as the sheet. */
+const isWorth  = r => /^(y|always)/i.test(String(r.worth||"").trim());
+const isAlways = r => /^always/i.test(String(r.worth||"").trim());
+let routeRows = [], sortCol = "rank", sortDir = 1;
+let filters = { region:"", fresh:false, worth:true, always:false, hazard:false, q:"", season:"", time:"" };
 /* row season/time tags are like "Spring/Summer", "All Seasons", "Morning/Day", "All Day" */
 function tagMatch(tag, want, allWord){
   if (!want) return true;
@@ -717,7 +726,8 @@ function renderTable(){
     if (!tagMatch(r.season, filters.season, "all seasons")) return false;
     if (!tagMatch(r.time,   filters.time,   "all day"))     return false;
     if (filters.fresh  && !/fresh/i.test(r.status||"")) return false;
-    if (filters.worth  && !/^y/i.test(r.worth||""))     return false;
+    if (filters.worth  && !isWorth(r))                  return false;
+    if (filters.always && !isAlways(r))                 return false;
     if (filters.hazard && !(r.warnings||"").trim())     return false;
     if (filters.q){
       const q = filters.q.toLowerCase();
@@ -743,7 +753,7 @@ function renderTable(){
     else { sortCol = k; sortDir = COLS.find(c=>c.k===k)?.numeric || k==="ev_per_hour" ? -1 : 1; }
     renderTable();
   });
-  $("#tbody").innerHTML = rows.map(r => `<tr>
+  $("#tbody").innerHTML = rows.map(r => `<tr class="${isAlways(r) ? "pinned" : ""}">
       <td class="rank">${r.rank ?? ""}</td>
       <td class="loc">${r.location||""}</td>
       <td>${r.region||""}</td>
@@ -755,7 +765,9 @@ function renderTable(){
       <td class="num">${fmt(r.ev_per_250)}</td>
       <td class="num">${fmt(r.ev_per_hour,3)}</td>
       <td>${statusHTML(r.status)}</td>
-      <td>${/^y/i.test(r.worth||"") ? '<span class="w-yes">Yes</span>' : (r.worth ? '<span class="w-no">'+r.worth+'</span>' : "")}</td>
+      <td>${isAlways(r) ? '<span class="w-always" title="Pinned to the top of the route by the Always Bonus">Always</span>'
+        : (/^y/i.test(r.worth||"") ? '<span class="w-yes">Yes</span>'
+        : (r.worth ? '<span class="w-no">'+r.worth+'</span>' : ""))}</td>
       <td class="note">${r.data_notes||""}</td>
       <td class="warn">${r.warnings||""}</td>
     </tr>`).join("");
@@ -768,6 +780,7 @@ function buildControls(){
   $("#regionsel").onchange = e => { filters.region = e.target.value; renderTable(); };
   $("#freshonly").onclick  = e => { filters.fresh  = !filters.fresh;  e.target.classList.toggle("on"); renderTable(); };
   $("#worthonly").onclick  = e => { filters.worth  = !filters.worth;  e.target.classList.toggle("on"); renderTable(); };
+  $("#alwaysonly").onclick = e => { filters.always = !filters.always; e.target.classList.toggle("on"); renderTable(); };
   $("#hazardonly").onclick = e => { filters.hazard = !filters.hazard; e.target.classList.toggle("on"); renderTable(); };
   $("#search").oninput = e => { filters.q = e.target.value; renderTable(); };
   document.querySelectorAll("[data-rseason]").forEach(ch => ch.onclick = () => {
